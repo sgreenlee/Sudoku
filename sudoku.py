@@ -134,6 +134,8 @@ class Sudoku(SquareBoard):
     ...
     ValueError: 10 is not a legal value for this sudoku
     >>> sudoku[3,5] = 8
+    >>> sudoku.possibilites[1, 1]
+    {1, 2, 3, 4, 5, 6, 7, 8, 9}
     >>> print(sudoku)
     +---+---+---+---+---+---+---+---+---+
     |   |   |   |   |   |   |   |   |   |
@@ -154,7 +156,32 @@ class Sudoku(SquareBoard):
     +---+---+---+---+---+---+---+---+---+
     |   |   |   |   |   |   |   |   |   |
     +---+---+---+---+---+---+---+---+---+
+    >>> sudoku.subgrid(3, 5)
+    [None, None, None, None, None, None, None, 8, None]
+    >>> sudoku[9, 1] = 4
+    >>> sudoku.subgrid(7, 3)
+    [None, None, None, None, None, None, 4, None, None]
+    >>> sudoku2 = Sudoku(7)
+    Traceback (most recent call last):
+    ...
+    ValueError: dimension of sudoku board must be a multiple of three
+
 """
+
+    def __init__(self, dimension=9):
+        if dimension % 3 != 0:
+            raise ValueError('dimension of sudoku board must'
+                             ' be a multiple of three')
+        super(Sudoku, self).__init__(dimension)
+        self.possibilites = SquareBoard(self.dimension)
+        self.possibilites._board = [set(range(1, self.dimension + 1))
+                                    for _ in range(self.dimension ** 2)]
+
+    def subgrid(self, row, col):
+        """Return the items in the subgrid containing cell (row, col)"""
+        x = (col - 1) // 3 * 3 + 1
+        y = (row - 1) // 3 * 3 + 1
+        return [self[i, j] for i in range(y, y + 3) for j in range(x, x + 3)]
 
     def __setitem__(self, position, value):
         value = int(value)
