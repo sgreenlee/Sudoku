@@ -82,6 +82,12 @@ class SquareBoard(object):
         retval.append(bars)
         return '\n'.join(retval)
 
+    def __len__(self):
+        return self.dimension ** 2
+
+    def __iter__(self):
+        return (x for x in self._board)
+
     def _colmajor(self, row, col):
         """For a row and column, return the corresponding index
         of a one-dimensional array in column major order."""
@@ -115,7 +121,7 @@ class SquareBoard(object):
             return self._board[self._rowmajor(*position)]
         except TypeError as exc:
             errmsg = 'board positions must be a sequence of 2 integers'
-            raise TypeError(errmsg)
+            raise TypeError(errmsg) from exc
 
     def __setitem__(self, position, value):
         try:
@@ -128,14 +134,16 @@ class SquareBoard(object):
 class Sudoku(SquareBoard):
     """A class representing a sudoku puzzle
 
-    >>> sudoku = Sudoku(9)
-    >>> sudoku[3,5] = 10
+    >>> sudoku = Sudoku()
+    >>> sudoku
+    Sudoku(dimension=9)
+    >>> sudoku[3, 5] = 10
     Traceback (most recent call last):
     ...
     ValueError: 10 is not a legal value for this sudoku
-    >>> sudoku[3,5] = 8
-    >>> sudoku.possibilites[1, 1]
-    {1, 2, 3, 4, 5, 6, 7, 8, 9}
+    >>> sudoku[3, 5] = 8
+    >>> sudoku.possibilities[1, 4]
+    {1, 2, 3, 4, 5, 6, 7, 9}
     >>> print(sudoku)
     +---+---+---+---+---+---+---+---+---+
     |   |   |   |   |   |   |   |   |   |
@@ -161,6 +169,14 @@ class Sudoku(SquareBoard):
     >>> sudoku[9, 1] = 4
     >>> sudoku.subgrid(7, 3)
     [None, None, None, None, None, None, 4, None, None]
+    >>> sudoku[1, 4] = 8
+    Traceback (most recent call last):
+    ...
+    sudoku.SudokuIntegrityError: illegal value for this cell
+    >>> sudoku.possibilities[6, 5]
+    {1, 2, 3, 4, 5, 6, 7, 9}
+    >>> sudoku.possibilities[1, 1]
+    {1, 2, 3, 5, 6, 7, 8, 9}
     >>> sudoku2 = Sudoku(7)
     Traceback (most recent call last):
     ...
@@ -173,9 +189,9 @@ class Sudoku(SquareBoard):
             raise ValueError('dimension of sudoku board must'
                              ' be a multiple of three')
         super(Sudoku, self).__init__(dimension)
-        self.possibilites = SquareBoard(self.dimension)
-        self.possibilites._board = [set(range(1, self.dimension + 1))
-                                    for _ in range(self.dimension ** 2)]
+        self.possibilities = SquareBoard(self.dimension)
+        self.possibilities._board = [set(range(1, self.dimension + 1))
+                                     for _ in range(self.dimension ** 2)]
 
     def subgrid(self, row, col):
         """Return the items in the subgrid containing cell (row, col)"""
@@ -183,10 +199,40 @@ class Sudoku(SquareBoard):
         y = (row - 1) // 3 * 3 + 1
         return [self[i, j] for i in range(y, y + 3) for j in range(x, x + 3)]
 
+    def clear_row(self, row, value):
+        """Remove the given value from all sets of possible values in
+        the given row."""
+        for i in range(1, self.dimension + 1):
+            self.possibilities[row, i].discard(value)
+
+    def clear_col(self, col, value):
+        """Remove the given value from all sets of possible values in
+        the given column."""
+        for i in range(1, self.dimension + 1):
+            self.possibilities[i, col].discard(value)
+
+    def clear_subgrid(self, row, col, value):
+        """Remove the given value from all sets of possible values in
+        the subgrid containing the given row and column."""
+        x = (col - 1) // 3 * 3 + 1
+        y = (row - 1) // 3 * 3 + 1
+        for i in range(y, y + 3):
+            for j in range(x, x + 3):
+                self.possibilities[i, j].discard(value)
+
     def __setitem__(self, position, value):
         value = int(value)
+        row, col = position
         if value < 1 or value > self.dimension:
             errmsg = '{} is not a legal value for this sudoku'.format(value)
             raise ValueError(errmsg)
+        # check for puzzle integrity errors
+        elif (value in self.row(row) or value in self.col(col) or
+              value in self.subgrid(row, col)):
+                raise SudokuIntegrityError('illegal value for this cell')
         else:
+            # update possibilities grid and add value to board
+            self.clear_row(row, value)
+            self.clear_col(col, value)
+            self.clear_subgrid(row, col, value)
             super(Sudoku, self).__setitem__(position, value)
