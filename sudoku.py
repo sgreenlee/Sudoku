@@ -1,6 +1,7 @@
 """A sudoku solver in python."""
 
 import numbers
+import functools
 
 
 class SudokuIntegrityError(Exception):
@@ -21,16 +22,20 @@ class SquareBoard(object):
     >>> tictactoe[1]
     Traceback (most recent call last):
     ...
-    TypeError: board positions must be a sequence of 2 integers
+    TypeError: __getitem__ indexes must be a sequence of 2 integers or slices
     >>> tictactoe[1, 3, 1] = 4
     Traceback (most recent call last):
     ...
-    TypeError: board positions must be a sequence of 2 integers
+    TypeError: __setitem__ indexes must be a sequence of 2 integers
     >>> tictactoe[1, 3] = 'O'
     >>> tictactoe.row(1)
     [None, None, 'O']
+    >>> tictactoe.row_values(1)
+    frozenset({'O'})
     >>> tictactoe.col(1)
     [None, None, None]
+    >>> tictactoe.col_values(1)
+    frozenset()
     >>> print(tictactoe)
     +---+---+---+
     |   |   | O |
@@ -66,6 +71,14 @@ class SquareBoard(object):
     def __init__(self, dimension):
         self.dimension = int(dimension)
         self._board = [None for x in range(self.dimension ** 2)]
+        self.__rows = []
+        for i in range(1, self.dimension + 1):
+            self.__rows.append(
+                frozenset((i, j) for j in range(1, self.dimension + 1)))
+        self.__cols = []
+        for j in range(1, self.dimension + 1):
+            self.__cols.append(
+                frozenset((i, j) for i in range(1, self.dimension + 1)))
 
     def __repr__(self):
         clsname = type(self).__name__
@@ -106,28 +119,64 @@ class SquareBoard(object):
                 raise ValueError(errmsg)
         return (col - 1) + (row - 1) * self.dimension
 
+    def row_values(self, row):
+        """Return a frozenset of the values in row i of the board."""
+        return frozenset(self[row, j] for j in range(1, self.dimension + 1)
+                         if self[row, j])
+
+    def col_values(self, col):
+        """Returns a frozenset of the values in col i of the board."""
+        return frozenset(self[i, col] for i in range(1, self.dimension + 1)
+                         if self[i, col])
+
     def row(self, row):
-        """Return a row of the board in a list."""
-        return [self._board[self._rowmajor(row, i + 1)]
-                for i in range(self.dimension)]
+        """Return a list of values in the given row of the board."""
+        return self[row, 1:(self.dimension + 1)]
 
     def col(self, col):
-        """Return a column of the board in a list."""
-        return [self._board[self._rowmajor(i + 1, col)]
-                for i in range(self.dimension)]
+        """Return a list of values in the given row of the board."""
+        return self[1:(self.dimension + 1), col]
+
+    def row_positions(self, i):
+        """Return a frozenset of positions in row i of the board."""
+        return self.__rows[i - 1]
+
+    def col_positions(self, col):
+        """Return a frozenset of positions in col i of the board."""
+        return self.__cols[i - 1]
 
     def __getitem__(self, position):
         try:
-            return self._board[self._rowmajor(*position)]
+            x, y = position
+            if isinstance(x, slice) or isinstance(y, slice):
+                if isinstance(x, slice):
+                    if x.step:
+                        rows = range(x.start, x.stop, x.step or None)
+                    else:
+                        rows = range(x.start, x.stop)
+                else:
+                    rows = (x,)
+                if isinstance(y, slice):
+                    if y.step:
+                        cols = range(y.start, y.stop, y.step or None)
+                    else:
+                        cols = range(y.start, y.stop)
+                else:
+                    cols = (y,)
+                return [self._board[self._rowmajor(row, col)] for row in rows
+                        for col in cols]
+            else:
+                return self._board[self._rowmajor(x, y)]
         except TypeError as exc:
-            errmsg = 'board positions must be a sequence of 2 integers'
+            errmsg = ('__getitem__ indexes must be a sequence of 2 integers'
+                      ' or slices')
             raise TypeError(errmsg) from exc
 
     def __setitem__(self, position, value):
         try:
             self._board[self._rowmajor(*position)] = value
         except TypeError as exc:
-            errmsg = 'board positions must be a sequence of 2 integers'
+            errmsg = '__setitem__ indexes must be a sequence of 2 integers'
             raise TypeError(errmsg) from exc
 
 
@@ -142,8 +191,6 @@ class Sudoku(SquareBoard):
     ...
     ValueError: 10 is not a legal value for this sudoku
     >>> sudoku[3, 5] = 8
-    >>> sudoku.possibilities[1, 4]
-    {1, 2, 3, 4, 5, 6, 7, 9}
     >>> print(sudoku)
     +---+---+---+---+---+---+---+---+---+
     |   |   |   |   |   |   |   |   |   |
@@ -173,10 +220,6 @@ class Sudoku(SquareBoard):
     Traceback (most recent call last):
     ...
     sudoku.SudokuIntegrityError: illegal value for this cell
-    >>> sudoku.possibilities[6, 5]
-    {1, 2, 3, 4, 5, 6, 7, 9}
-    >>> sudoku.possibilities[1, 1]
-    {1, 2, 3, 5, 6, 7, 8, 9}
     >>> sudoku2 = Sudoku(7)
     Traceback (most recent call last):
     ...
@@ -189,36 +232,32 @@ class Sudoku(SquareBoard):
             raise ValueError('dimension of sudoku board must'
                              ' be a multiple of three')
         super(Sudoku, self).__init__(dimension)
-        self.possibilities = SquareBoard(self.dimension)
-        self.possibilities._board = [set(range(1, self.dimension + 1))
-                                     for _ in range(self.dimension ** 2)]
+        self.__subgrids = []
+        for i in range(self.dimension // 3):
+            for j in range(self.dimension // 3):
+                x = j * 3 + 1
+                y = i * 3 + 1
+                self.__subgrids.append(
+                    frozenset((row, col) for row in range(y, y + 3)
+                              for col in range(x, x + 3)))
 
     def subgrid(self, row, col):
         """Return the items in the subgrid containing cell (row, col)"""
-        x = (col - 1) // 3 * 3 + 1
-        y = (row - 1) // 3 * 3 + 1
-        return [self[i, j] for i in range(y, y + 3) for j in range(x, x + 3)]
+        x = ((col - 1) // 3) * 3 + 1
+        y = ((row - 1) // 3) * 3 + 1
+        rows = slice(y, y + 3)
+        cols = slice(x, x + 3)
+        return self[rows, cols]
 
-    def clear_row(self, row, value):
-        """Remove the given value from all sets of possible values in
-        the given row."""
-        for i in range(1, self.dimension + 1):
-            self.possibilities[row, i].discard(value)
+    def subgrid_positions(self, row, col):
+        index = ((col - 1) // 3) + 3 * ((row - 1) // 3)
+        return self.__subgrids[index]
 
-    def clear_col(self, col, value):
-        """Remove the given value from all sets of possible values in
-        the given column."""
-        for i in range(1, self.dimension + 1):
-            self.possibilities[i, col].discard(value)
-
-    def clear_subgrid(self, row, col, value):
-        """Remove the given value from all sets of possible values in
-        the subgrid containing the given row and column."""
-        x = (col - 1) // 3 * 3 + 1
-        y = (row - 1) // 3 * 3 + 1
-        for i in range(y, y + 3):
-            for j in range(x, x + 3):
-                self.possibilities[i, j].discard(value)
+    def subgrid_values(self, row, col):
+        """Return frozenset of values in subgrid of board containing given
+        row and column."""
+        return frozenset(self[pos] for pos in self.subgrid_positions(row, col)
+                         if self[pos])
 
     def __setitem__(self, position, value):
         value = int(value)
@@ -227,12 +266,9 @@ class Sudoku(SquareBoard):
             errmsg = '{} is not a legal value for this sudoku'.format(value)
             raise ValueError(errmsg)
         # check for puzzle integrity errors
-        elif (value in self.row(row) or value in self.col(col) or
-              value in self.subgrid(row, col)):
+        elif (value in self.row_values(row) or
+              value in self.col_values(col) or
+              value in self.subgrid_values(row, col)):
                 raise SudokuIntegrityError('illegal value for this cell')
         else:
-            # update possibilities grid and add value to board
-            self.clear_row(row, value)
-            self.clear_col(col, value)
-            self.clear_subgrid(row, col, value)
             super(Sudoku, self).__setitem__(position, value)
