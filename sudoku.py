@@ -2,6 +2,7 @@
 
 import numbers
 import functools
+import math
 
 
 class SudokuIntegrityError(Exception):
@@ -44,7 +45,15 @@ class SquareBoard(object):
     +---+---+---+
     |   |   |   |
     +---+---+---+
-
+    >>> tictactoe2 = SquareBoard.from_list(['X', 'X', 'O', 'O', 'O', 'X', 'X', 'X', 'O'])
+    >>> print(tictactoe2)
+    +---+---+---+
+    | X | X | O |
+    +---+---+---+
+    | O | O | X |
+    +---+---+---+
+    | X | X | O |
+    +---+---+---+
     >>> sudoku = SquareBoard(9)
     >>> print(sudoku)
     +---+---+---+---+---+---+---+---+---+
@@ -94,6 +103,16 @@ class SquareBoard(object):
             retval.append(spaces.format(*[x or ' ' for x in self.row(i)]))
         retval.append(bars)
         return '\n'.join(retval)
+
+    @classmethod
+    def from_list(cls, lst):
+        """Instantiate a board from a list of values."""
+        dim = int(math.sqrt(len(lst)))
+        if dim * dim != len(lst):
+            raise ValueError('length of list must be a square number')
+        new = cls(dim)
+        new._board = lst
+        return new
 
     def __len__(self):
         return self.dimension ** 2
