@@ -29,6 +29,11 @@ class SquareBoard(object):
     ...
     TypeError: __setitem__ indexes must be a sequence of 2 integers
     >>> tictactoe[1, 3] = 'O'
+    >>> for value, (row, col) in tictactoe:
+    ...    if value:
+    ...        print("tictactoe[{}, {}] = {}".format(row, col, value))
+    tictactoe[1, 3] = O
+    tictactoe[2, 2] = X
     >>> tictactoe.row(1)
     [None, None, 'O']
     >>> tictactoe.row_values(1)
@@ -118,7 +123,9 @@ class SquareBoard(object):
         return self.dimension ** 2
 
     def __iter__(self):
-        return (x for x in self._board)
+        return ((self[row, col], (row, col))
+                for row in range(1, self.dimension + 1)
+                for col in range(1, self.dimension + 1))
 
     def _colmajor(self, row, col):
         """For a row and column, return the corresponding index
@@ -162,7 +169,7 @@ class SquareBoard(object):
 
     def col_positions(self, col):
         """Return a frozenset of positions in col i of the board."""
-        return self.__cols[i - 1]
+        return self.__cols[col - 1]
 
     def __getitem__(self, position):
         try:
@@ -239,17 +246,11 @@ class Sudoku(SquareBoard):
     Traceback (most recent call last):
     ...
     sudoku.SudokuIntegrityError: illegal value for this cell
-    >>> sudoku2 = Sudoku(7)
-    Traceback (most recent call last):
-    ...
-    ValueError: dimension of sudoku board must be a multiple of three
 
 """
 
-    def __init__(self, dimension=9):
-        if dimension % 3 != 0:
-            raise ValueError('dimension of sudoku board must'
-                             ' be a multiple of three')
+    def __init__(self):
+        dimension = 9
         super(Sudoku, self).__init__(dimension)
         self.__subgrids = []
         for i in range(self.dimension // 3):
@@ -291,3 +292,7 @@ class Sudoku(SquareBoard):
                 raise SudokuIntegrityError('illegal value for this cell')
         else:
             super(Sudoku, self).__setitem__(position, value)
+
+
+
+        # initialize updates
