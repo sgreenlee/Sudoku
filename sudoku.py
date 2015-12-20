@@ -249,8 +249,7 @@ class Sudoku(SquareBoard):
 
 """
 
-    def __init__(self):
-        dimension = 9
+    def __init__(self, dimension=9):
         super(Sudoku, self).__init__(dimension)
         self.__subgrids = []
         for i in range(self.dimension // 3):
