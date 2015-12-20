@@ -26,11 +26,13 @@ class SudokuSolver(object):
                 self.clear_col(col, value)
                 self.clear_subgrid(row, col, value)
                 self.updates.add((value, (row, col)))
+                for ps in self.possibilities:
+                    ps.discard((row, col))
 
         while self.updates:
             while self.updates:
                 # while self.updates:
-                val, (row, col) = self.updates.pop()
+                value, (row, col) = self.updates.pop()
                 for i in range(1, dim + 1):
                     self.check_row(i, value)
                     self.check_col(i, value)
@@ -41,6 +43,11 @@ class SudokuSolver(object):
             for value, (row, col) in self.puzzle:
                 if not value:
                     self.check_cell(row, col)
+
+            # for value in range(1, dim + 1):
+            #     for row in [2, 5, 8]:
+            #         for col in [2, 5, 8]:
+            #             self.check_subgrid(row, col, value)
 
     def update_cell(self, row, col, value):
         self.clear_row(row, value)
