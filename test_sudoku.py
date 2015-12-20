@@ -1,5 +1,6 @@
 from sudoku import Sudoku
 from solver import SudokuSolver
+import itertools
 
 easy_sudoku = Sudoku()
 
@@ -39,10 +40,28 @@ easy_sudoku[8, 8] = 7
 easy_sudoku[9, 8] = 8
 easy_sudoku[9, 9] = 9
 
-
-print(easy_sudoku)
 slvr = SudokuSolver(easy_sudoku)
 
+medium_sudoku = Sudoku.from_list([
+    None, None, None,    6, None, None,    4, None, None,
+    None,    5,    2, None,    3, None, None,    8, None,
+       4, None, None,    5, None, None,    7, None, None,
+       5, None,    1, None, None, None, None,    4, None,
+       7, None, None,    3, None,    6, None, None,    8,
+    None,    2, None, None, None, None,    1, None,    7,
+    None, None,    6, None, None,    5, None, None,    1,
+    None,    4, None, None,    6, None,    9,    7, None,
+    None, None,    5, None, None,    7, None, None, None])
+
 if __name__ == '__main__':
+
+    print("Easy Sudoku")
+    print(easy_sudoku)
     slvr.solve()
     print(easy_sudoku)
+
+    print("Medium sudoku:")
+    print(medium_sudoku)
+    slvr = SudokuSolver(medium_sudoku)
+    slvr.solve()
+    print(medium_sudoku)
